@@ -184,7 +184,7 @@ void BTU_StartUp(void)
     osi_mutex_new(&btu_l2cap_alarm_lock);
 
     const size_t workqueue_len[] = {BTU_TASK_WORKQUEUE0_LEN};
-    btu_thread = osi_thread_create(BTU_TASK_NAME, BTU_TASK_STACK_SIZE, BTU_TASK_PRIO, BTU_TASK_PINNED_TO_CORE,
+    btu_thread = osi_thread_create(BTU_TASK_NAME, BTU_TASK_STACK_SIZE, true, BTU_TASK_PRIO, BTU_TASK_PINNED_TO_CORE,
                                    BTU_TASK_WORKQUEUE_NUM, workqueue_len);
     if (btu_thread == NULL) {
         goto error_exit;

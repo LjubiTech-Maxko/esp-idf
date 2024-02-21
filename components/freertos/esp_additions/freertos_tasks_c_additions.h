@@ -340,6 +340,34 @@ _Static_assert( tskNO_AFFINITY == ( BaseType_t ) CONFIG_FREERTOS_NO_AFFINITY, "C
         return xReturn;
     }
 
+BaseType_t xTaskCreateRestrictedStaticPinnedToCore(TaskFunction_t pxTaskCode,
+                                                const char * const pcName,
+                                                uint32_t usStackDepth,
+                                                StackType_t * stack,
+                                                void * const pvParameters,
+                                                UBaseType_t uxPriorit,
+                                                TaskHandle_t *pxCreatedTask,
+                                                const BaseType_t xCoreID)
+
+{
+        printf("Task: Create stack of \033[0;32;31m %s \033[m Task From External(%d)\n", pcName, (int)usStackDepth);
+        TaskParameters_t xRegParameters = {
+            .pvTaskCode = pxTaskCode,
+            .pcName = pcName,
+            .usStackDepth = usStackDepth,
+            .pvParameters = pvParameters,
+            .uxPriority = uxPriorit | portPRIVILEGE_BIT,
+            .puxStackBuffer = stack,
+            .xRegions = {{
+                    .pvBaseAddress = 0x00,
+                    .ulLengthInBytes = 0x00,
+                    .ulParameters = 0x00,
+                }
+            }
+        };
+        return xTaskCreateRestrictedPinnedToCore(&xRegParameters, pxCreatedTask, xCoreID);
+}
+
 #endif /* ( configSUPPORT_DYNAMIC_ALLOCATION == 1 ) */
 /*----------------------------------------------------------*/
 
