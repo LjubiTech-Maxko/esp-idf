@@ -61,6 +61,17 @@ struct osi_event {
 
 static const size_t DEFAULT_WORK_QUEUE_CAPACITY = 100;
 
+
+static inline bool ext_psram_is_enable(void)
+{
+#if defined(CONFIG_SPIRAM_BOOT_INIT) &&     \
+    (CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY)
+    return true;
+#else
+    return false;
+#endif
+}
+
 static struct work_queue *osi_work_queue_create(size_t capacity)
 {
     if (capacity == 0) {
@@ -203,7 +214,7 @@ static void osi_thread_stop(osi_thread_t *thread)
 }
 
 //in linux, the stack_size, priority and core may not be set here, the code will be ignore the arguments
-osi_thread_t *osi_thread_create(const char *name, size_t stack_size, int priority, osi_thread_core_t core, uint8_t work_queue_num, const size_t work_queue_len[])
+osi_thread_t *osi_thread_create(const char *name, size_t stack_size, bool ext, int priority, osi_thread_core_t core, uint8_t work_queue_num, const size_t work_queue_len[])
 {
     int ret;
     struct osi_thread_start_arg start_arg = {0};
@@ -250,8 +261,18 @@ osi_thread_t *osi_thread_create(const char *name, size_t stack_size, int priorit
         goto _err;
     }
 
-    if (xTaskCreatePinnedToCore(osi_thread_run, name, stack_size, &start_arg, priority, &thread->thread_handle, core) != pdPASS) {
-        goto _err;
+    if (ext_psram_is_enable() && (ext == true)) {
+        StackType_t *stack = (StackType_t *)heap_caps_calloc(1, stack_size, MALLOC_CAP_SPIRAM);
+        assert(stack);
+        if (xTaskCreateRestrictedStaticPinnedToCore(osi_thread_run, name, stack_size, stack,
+                    &start_arg,  priority,  &thread->thread_handle, core) != pdPASS) {
+            goto _err;
+        }
+    }
+    else {
+        if (xTaskCreatePinnedToCore(osi_thread_run, name, stack_size, &start_arg, priority, &thread->thread_handle, core) != pdPASS) {
+            goto _err;
+        }
     }
 
     osi_sem_take(&start_arg.start_sem, OSI_SEM_MAX_TIMEOUT);

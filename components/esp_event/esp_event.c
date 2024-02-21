@@ -493,6 +493,24 @@ esp_err_t esp_event_loop_create(const esp_event_loop_args_t* event_loop_args, es
 
     // Create the loop task if requested
     if (event_loop_args->task_name != NULL) {
+#if ((defined CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY) && (defined CONFIG_IDF_TARGET_ESP32)) || \
+    ((defined CONFIG_IDF_TARGET_ESP32S3) && (defined CONFIG_SPIRAM_BOOT_INIT))
+    StackType_t *stack = (StackType_t *)heap_caps_calloc(1,  event_loop_args->task_stack_size, MALLOC_CAP_SPIRAM);
+    assert(stack);
+    BaseType_t task_created = xTaskCreateRestrictedStaticPinnedToCore(esp_event_loop_run_task,
+                                                                     event_loop_args->task_name, 
+                                                                     event_loop_args->task_stack_size,
+                                                                    stack,
+                                                                    (void*) loop,
+                                                                    event_loop_args->task_priority,
+                                                                    &(loop->task),
+                                                                    event_loop_args->task_core_id);
+    if (task_created != pdPASS) {
+        ESP_LOGE(TAG, "create task for loop failed");
+        err = ESP_FAIL;
+        goto on_err;
+    }
+#else
         BaseType_t task_created = xTaskCreatePinnedToCore(esp_event_loop_run_task, event_loop_args->task_name,
                     event_loop_args->task_stack_size, (void*) loop,
                     event_loop_args->task_priority, &(loop->task), event_loop_args->task_core_id);
@@ -502,7 +520,7 @@ esp_err_t esp_event_loop_create(const esp_event_loop_args_t* event_loop_args, es
             err = ESP_FAIL;
             goto on_err;
         }
-
+#endif
         loop->name = event_loop_args->task_name;
 
         ESP_LOGD(TAG, "created task for loop %p", loop);
